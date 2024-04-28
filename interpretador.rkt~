@@ -1,0 +1,59 @@
+#| eopl.ss:  A simple language for the book "Essentials of Programming Languages"
+
+Creado por: Juan Manuel Arango 
+
+Inicio: 2024-04-28
+
+proyecto de curso de Fundamentos de lenguaje de programación (FLP)|#
+
+#lang eopl
+
+
+
+;;Define the lexical specification for the language
+(define lexical-specification
+  '(
+    (white-space (whitespace) skip)
+    (comment ("#" (arbno (not #\newline))) skip)
+    (identifier (letter (arbno (or letter digit "?"))) symbol)
+    (number (digit (arbno digit)) number)
+    (number ("-" (digit (arbno digit))) number)
+    (number (digit (arbno digit) "." digit (arbno digit)) number)
+    (number ("-" digit (arbno digit) "." digit (arbno digit)) number)
+  )
+)
+
+
+;; Define the grammar specification for the Language
+
+(define grammar-specification)
+  '(
+    (program (exp) program)
+    (exp (number) number)
+    (exp (identifier) identifier)
+    (exp "(" (arbno exp) ")" list)
+  )
+
+;; Create datatype automatically
+(sllgen:make-define-datatypes lexical-specification grammar-specification)
+
+
+;; Build the scanner
+(sllgen:make-scanner lexical-specification grammar-specification)
+
+
+;; Build the parser
+(sllgen:make-parser lexical-specification grammar-specification)
+
+;; Build the evaluator, this is a simple evaluator that just returns the value of the expression
+(define eval-program
+  (lambda (program)
+    program
+  )
+)
+
+;; Build the REPL
+(sllgen:make-rep-loop "-->" eval-program (sllgen:make-stream-parser lexical-specification grammar-specification))
+
+
+
