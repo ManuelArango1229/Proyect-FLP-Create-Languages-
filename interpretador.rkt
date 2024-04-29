@@ -45,14 +45,92 @@ proyecto de curso de Fundamentos de lenguaje de programación (FLP)|#
 ;; Create datatype automatically
 (sllgen:make-define-datatypes lexical-specification grammar-specification)
 
-;; Build the evaluator, this is a simple evaluator that just returns the value of the expression
-(define eval-program
-  (lambda (program)
-    program
+
+
+;;Environment 
+;;
+
+(define-datatype env env?
+  (empty-env)
+  (extend-env (Lid (list-of symbol?)) (LVal (list-of value?)) (env env?))
+)
+
+(define value? 
+  (lambda (x)
+    #T
   )
 )
 
-;; Build the REPL
+;;Apply env, function to apply the environment to the value
+(define apply-env
+  (lambda (e id)
+    (cases env e
+      (empty-env () (eopl:error "No find the value"))
+      (extend-env (lid lval e)
+        (letrec
+          (
+            (aux (lambda (lid lval)
+              (cond
+                [(null? lid) (eopl:error "No find the value")]   
+                [(eq? (car lid) id) (car lval)]
+                [else (aux (cdr lid) (cdr lval))]
+              )
+              )
+            )
+          )
+          (aux lid lval)
+        )
+      )
+    )
+  )
+)
+
+;;Inittial environment
+(define init-env
+  (extend-env '(x y z) '(1 2 3) (empty-env))
+)
+
+;;Job function (evaluate the expression)
+(define eval-exp
+  (lambda (e env)
+    (cases exp e
+      (lit-exp (n) n)
+      (var-exp (id) (apply-env env id))
+      (prim-exp (prim larg) 
+        (let
+          (
+            (lvalues (map (lambda (e) (eval-exp e env)) larg))
+          )
+          (eval-prim prim lvalues)
+        )
+      )
+    )
+  )
+)
+
+
+
+(define eval-prim
+  (lambda (prim lvalues)
+    (cases primitive prim
+      (sum-prim () (apply + lvalues))
+      (menus-prim () (apply - lvalues))
+      (mulp-prim () (apply * lvalues))
+      (dev-prim () (apply / lvalues))
+      (add-prim () (+ 1 (car lvalues)))
+      (sub-prim () (- 1 (car lvalues)))
+)
+    )
+  )
+;; Build the evaluator, this is a simple evaluator that just returns the value of the expression
+(define eval-program
+  (lambda (prog)
+    (cases program prog
+      (a-program (e) (eval-exp e init-env))
+    )
+  )
+  )
+  ;; Build the REPL
 (define Interpreter
   (sllgen:make-rep-loop "-->" eval-program (sllgen:make-stream-parser lexical-specification grammar-specification))
 )
