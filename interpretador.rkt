@@ -30,15 +30,30 @@ proyecto de curso de Fundamentos de lenguaje de programación (FLP)|#
 (define grammar-specification
   '(
     (program (exp) a-program)
+    ;;Expression management
     (exp (numbers) lit-exp)
     (exp (identifier) var-exp)
     (exp (primitive "(" (separated-list exp ",") ")") prim-exp)
+    ;;boolean management
+    (exp ("true") true-exp)
+    (exp ("false") false-exp)
+    ;;Conditional management
+    (exp ("if" exp "then" exp "else" exp) if-exp)
+    ;;Primitive management
     (primitive ("+") sum-prim)
     (primitive ("-") menus-prim)
     (primitive ("*") mulp-prim)
     (primitive ("/") dev-prim)
     (primitive ("add1") add-prim)
     (primitive ("sub1") sub-prim)
+    (primitive ("<") lt-prim)
+    (primitive (">") gt-prim)
+    (primitive ("=") eq-prim)
+    (primitive ("<=") leq-prim)
+    (primitive (">=") geq-prim)
+    (primitive ("and") and-prim)
+    (primitive ("or") or-prim)
+    (primitive ("not") not-prim)
   )
 )
 
@@ -46,8 +61,32 @@ proyecto de curso de Fundamentos de lenguaje de programación (FLP)|#
 (sllgen:make-define-datatypes lexical-specification grammar-specification)
 
 
-
-;;Environment 
+;;Job function (evaluate the expression)
+(define eval-exp
+  (lambda (e env)
+    (cases exp e
+      (lit-exp (n) n)
+      (var-exp (id) (apply-env env id))
+      ;;Primitive
+      (prim-exp (prim larg) 
+        (let
+          (
+            (lvalues (map (lambda (e) (eval-exp e env)) larg))
+          )
+          (eval-prim prim lvalues)
+        )
+      )
+      ;;Booolean
+      (true-exp () #T)
+      (false-exp () #F)
+      ;;Conditional
+      (if-exp (cond exp1 exp2)
+        (if (eval-exp cond env) (eval-exp exp1 env) (eval-exp exp2 env))
+      ) 
+    )
+  )
+)
+;;Environment
 ;;
 
 (define-datatype env env?
@@ -90,25 +129,8 @@ proyecto de curso de Fundamentos de lenguaje de programación (FLP)|#
   (extend-env '(x y z) '(1 2 3) (empty-env))
 )
 
-;;Job function (evaluate the expression)
-(define eval-exp
-  (lambda (e env)
-    (cases exp e
-      (lit-exp (n) n)
-      (var-exp (id) (apply-env env id))
-      (prim-exp (prim larg) 
-        (let
-          (
-            (lvalues (map (lambda (e) (eval-exp e env)) larg))
-          )
-          (eval-prim prim lvalues)
-        )
-      )
-    )
-  )
-)
 
-
+;;Function to evaluate the primitive
 
 (define eval-prim
   (lambda (prim lvalues)
@@ -119,9 +141,17 @@ proyecto de curso de Fundamentos de lenguaje de programación (FLP)|#
       (dev-prim () (apply / lvalues))
       (add-prim () (+ 1 (car lvalues)))
       (sub-prim () (- 1 (car lvalues)))
-)
+      (lt-prim () (< (car lvalues) (cadr lvalues)))
+      (gt-prim () (> (car lvalues) (cadr lvalues)))
+      (eq-prim () (= (car lvalues) (cadr lvalues)))
+      (leq-prim () (<= (car lvalues) (cadr lvalues)))
+      (geq-prim () (>= (car lvalues) (cadr lvalues)))
+      (and-prim () (and (car lvalues) (cadr lvalues)))
+      (or-prim () (or (car lvalues) (cadr lvalues)))
+      (not-prim () (not (car lvalues)))
     )
   )
+)
 ;; Build the evaluator, this is a simple evaluator that just returns the value of the expression
 (define eval-program
   (lambda (prog)
@@ -129,10 +159,12 @@ proyecto de curso de Fundamentos de lenguaje de programación (FLP)|#
       (a-program (e) (eval-exp e init-env))
     )
   )
-  )
+)
   ;; Build the REPL
 (define Interpreter
   (sllgen:make-rep-loop "-->" eval-program (sllgen:make-stream-parser lexical-specification grammar-specification))
 )
+
+(Interpreter)
 
 
