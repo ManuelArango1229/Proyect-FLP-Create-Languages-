@@ -2,11 +2,11 @@
 
 #| eopl.ss:  A simple language for the book "Essentials of Programming Languages"
 
-Creado por: Juan Manuel Arango 
+Created by: Juan Manuel Arango 
 
-Inicio: 2024-04-28
+Start: 2024-04-28
 
-proyecto de curso de Fundamentos de lenguaje de programación (FLP)|#
+fundamentals of programming lenguages course project (FLP)|#
 
 
 ;;Define the lexical specification for the language
@@ -39,6 +39,11 @@ proyecto de curso de Fundamentos de lenguaje de programación (FLP)|#
     (exp ("false") false-exp)
     ;;Conditional management
     (exp ("if" exp "then" exp "else" exp) if-exp)
+    ;;ligature management
+    (exp ("let" (arbno identifier "=" exp) "in" exp) let-exp)
+    ;;Procedure management
+    (exp ("proc" "("(separated-list identifier ",")")" exp) proc-exp)
+    (exp ("(" exp (arbno exp) ")") call-exp)
     ;;Primitive management
     (primitive ("+") sum-prim)
     (primitive ("-") menus-prim)
@@ -82,13 +87,41 @@ proyecto de curso de Fundamentos de lenguaje de programación (FLP)|#
       ;;Conditional
       (if-exp (cond exp1 exp2)
         (if (eval-exp cond env) (eval-exp exp1 env) (eval-exp exp2 env))
-      ) 
+      )
+      ;ligature
+      (let-exp (ids rands body)
+        (let
+          (
+            (lvalues (map (lambda (x) (eval-exp x env)) rands))
+          )
+          (eval-exp body (extend-env ids lvalues env))
+        )
+      )
+      ;;Precedure
+      (proc-exp (ids body)
+        (Closure ids body env)
+      )
+      (call-exp (rator rands)
+        (let
+          (
+            (procV (eval-exp rator env))
+            (lrands (map (lambda (x) (eval-exp x env)) rands))
+          )
+          (if (procval? procV) 
+              (cases procval procV
+                (Closure (lids body old-env)
+                  (eval-exp body (extend-env lids lrands old-env))
+                )
+              )
+            (eopl:error "Not a procedure " procV)
+          )
+        )
+      )
     )
   )
 )
-;;Environment
-;;
 
+;;Environment
 (define-datatype env env?
   (empty-env)
   (extend-env (Lid (list-of symbol?)) (LVal (list-of value?)) (env env?))
@@ -105,12 +138,12 @@ proyecto de curso de Fundamentos de lenguaje de programación (FLP)|#
   (lambda (e id)
     (cases env e
       (empty-env () (eopl:error "No find the value"))
-      (extend-env (lid lval e)
+      (extend-env (lid lval old-env)
         (letrec
           (
             (aux (lambda (lid lval)
               (cond
-                [(null? lid) (eopl:error "No find the value")]   
+                [(null? lid) (apply-env old-env id)]   
                 [(eq? (car lid) id) (car lval)]
                 [else (aux (cdr lid) (cdr lval))]
               )
@@ -152,6 +185,16 @@ proyecto de curso de Fundamentos de lenguaje de programación (FLP)|#
     )
   )
 )
+
+;;Closure: Content information of procedure, linked to the place where it was created.
+(define-datatype procval procval?
+  (Closure
+    (ids (list-of symbol?))
+    (body exp?)
+    (environmet env?)
+  )
+)
+
 ;; Build the evaluator, this is a simple evaluator that just returns the value of the expression
 (define eval-program
   (lambda (prog)
@@ -166,5 +209,4 @@ proyecto de curso de Fundamentos de lenguaje de programación (FLP)|#
 )
 
 (Interpreter)
-
 
