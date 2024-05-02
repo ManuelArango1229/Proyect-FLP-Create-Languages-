@@ -44,6 +44,8 @@ fundamentals of programming lenguages course project (FLP)|#
     ;;Procedure management
     (exp ("proc" "("(separated-list identifier ",")")" exp) proc-exp)
     (exp ("(" exp (arbno exp) ")") call-exp)
+    ;;Recursive Procedure management
+    (exp ("letrec" (arbno identifier "(" (separated-list identifier ",") ")" "=" exp) "in" exp) letrec-exp)
     ;;Primitive management
     (primitive ("+") sum-prim)
     (primitive ("-") menus-prim)
@@ -117,6 +119,10 @@ fundamentals of programming lenguages course project (FLP)|#
           )
         )
       )
+      ;;letrec (only recursively procedure)
+      (letrec-exp (procnames idss bodies bodyletrec)
+        (eval-exp bodyletrec (extend-recursive-env procnames idss bodies env))
+      )
     )
   )
 )
@@ -125,6 +131,7 @@ fundamentals of programming lenguages course project (FLP)|#
 (define-datatype env env?
   (empty-env)
   (extend-env (Lid (list-of symbol?)) (LVal (list-of value?)) (env env?))
+  (extend-recursive-env (Lprocnames (list-of symbol?)) (idss (list-of (list-of symbol?))) (bodies (list-of exp?))  (old-env env?))
 )
 
 (define value? 
@@ -143,7 +150,7 @@ fundamentals of programming lenguages course project (FLP)|#
           (
             (aux (lambda (lid lval)
               (cond
-                [(null? lid) (apply-env old-env id)]   
+                [(null? lid) (apply-env old-env id)]
                 [(eq? (car lid) id) (car lval)]
                 [else (aux (cdr lid) (cdr lval))]
               )
@@ -153,9 +160,25 @@ fundamentals of programming lenguages course project (FLP)|#
           (aux lid lval)
         )
       )
+      ;;variant was added to extend-recursive-env in apply-env, if it finds the name functions, return the closure with the definition of procedure
+      (extend-recursive-env (lprocname idss bodies old-env)
+        (letrec
+          (
+            (aux (lambda (lprocnames lidss lbodies old-env)
+                (cond
+                  [(null? lprocnames) (apply-env old-env id)]
+                  [(eq? (car lprocnames) id) (Closure (car lidss) (car lbodies) e)]
+                  [else (aux (cdr lprocnames) (cdr lidss) (cdr bodies))]
+                )
+                   )
+            )
+           )
+            (aux lprocname idss bodies old-env)
+         )
+        )
+      )
     )
   )
-)
 
 ;;Inittial environment
 (define init-env
@@ -208,5 +231,5 @@ fundamentals of programming lenguages course project (FLP)|#
   (sllgen:make-rep-loop "-->" eval-program (sllgen:make-stream-parser lexical-specification grammar-specification))
 )
 
-(Interpreter)
+-(Interpreter)
 
