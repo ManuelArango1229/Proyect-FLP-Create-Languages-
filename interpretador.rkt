@@ -22,9 +22,6 @@ fundamentals of programming lenguages course project (FLP)|#
   )
 ) 
 
-
-
-
 ;; Define the grammar specification for the Language
 
 (define grammar-specification
@@ -46,6 +43,11 @@ fundamentals of programming lenguages course project (FLP)|#
     (exp ("(" exp (arbno exp) ")") call-exp)
     ;;Recursive Procedure management
     (exp ("letrec" (arbno identifier "(" (separated-list identifier ",") ")" "=" exp) "in" exp) letrec-exp)
+    ;;Assignment
+    ;;Begin
+    (exp ("begin" exp (arbno ";" exp) "end") begin-exp)
+    ;;Set
+    (exp ("set" identifier "=" exp) set-exp)
     ;;Primitive management
     (primitive ("+") sum-prim)
     (primitive ("-") menus-prim)
@@ -123,6 +125,37 @@ fundamentals of programming lenguages course project (FLP)|#
       (letrec-exp (procnames idss bodies bodyletrec)
         (eval-exp bodyletrec (extend-recursive-env procnames idss bodies env))
       )
+      ;;begin
+      (begin-exp (exp lexp)
+        (if (null? lexp) 
+          (eval-exp exp env)
+          (begin 
+            (eval-exp exp env)
+            (letrec
+              (
+               (aux (lambda (lexp)
+                  (cond
+                    [(null? (cdr lexp)) (eval-exp (car lexp) env)]
+                    [else (begin (eval-exp (car lexp) env) (aux (cdr lexp)))]
+
+                    )
+                      ))
+               )
+              
+            (aux lexp)
+              )
+          )
+        )
+      )
+      ;;Set 
+      (set-exp (id exp)
+        (begin
+          (begin
+              (setref! (apply-env-ref env id) (eval-exp exp env))
+              1
+          )
+        )
+      )
     )
   )
 )
@@ -130,55 +163,75 @@ fundamentals of programming lenguages course project (FLP)|#
 ;;Environment
 (define-datatype env env?
   (empty-env)
-  (extend-env (Lid (list-of symbol?)) (LVal (list-of value?)) (env env?))
-  (extend-recursive-env (Lprocnames (list-of symbol?)) (idss (list-of (list-of symbol?))) (bodies (list-of exp?))  (old-env env?))
+  (extend-env-ref (Lid (list-of symbol?)) (LVal vector?) (env env?))
 )
 
-(define value? 
-  (lambda (x)
-    #T
+(define extend-env
+  (lambda (ids vals env)
+    (extend-env-ref ids (list->vector vals) env)
+  )
+)
+
+;;Recursive environment
+
+(define extend-recursive-env
+  (lambda (procnames idss bodies old-env)
+    (let
+      (
+       (vec-closure (make-vector (length procnames)))
+      )
+      (letrec
+        (
+          (amb (extend-env-ref procnames vec-closure old-env))
+          (get-closure (lambda (ids bodies pos)
+            (cond
+              [(null? ids) amb]
+              [else
+                (begin
+                  (vector-set! vec-closure pos (Closure (car ids) (car bodies) amb)) (get-closure (cdr ids) (cdr bodies) (+ pos 1))
+                )
+              ]
+            )
+            )
+          )
+        )
+        (get-closure idss bodies 0)
+      )
+    )
+  )
+)
+
+(define apply-env
+  (lambda (env var)
+    (deref (apply-env-ref env var))
   )
 )
 
 ;;Apply env, function to apply the environment to the value
-(define apply-env
+(define apply-env-ref
   (lambda (e id)
     (cases env e
       (empty-env () (eopl:error "No find the value"))
-      (extend-env (lid lval old-env)
+      (extend-env-ref (lid vec old-env)
         (letrec
           (
-            (aux (lambda (lid lval)
+            (aux (lambda (lid lval pos )
               (cond
-                [(null? lid) (apply-env old-env id)]
-                [(eq? (car lid) id) (car lval)]
-                [else (aux (cdr lid) (cdr lval))]
+                [(null? lid) (apply-env-ref old-env id)]
+                [(eq? (car lid) id) (a-ref pos vec)]
+                [else (aux (cdr lid) vec (+ pos 1))]
               )
               )
             )
           )
-          (aux lid lval)
-        )
-      )
-      ;;variant was added to extend-recursive-env in apply-env, if it finds the name functions, return the closure with the definition of procedure
-      (extend-recursive-env (lprocname idss bodies old-env)
-        (letrec
-          (
-            (aux (lambda (lprocnames lidss lbodies old-env)
-                (cond
-                  [(null? lprocnames) (apply-env old-env id)]
-                  [(eq? (car lprocnames) id) (Closure (car lidss) (car lbodies) e)]
-                  [else (aux (cdr lprocnames) (cdr lidss) (cdr bodies))]
-                )
-                   )
-            )
-           )
-            (aux lprocname idss bodies old-env)
-         )
+          (aux lid vec 0)
         )
       )
     )
   )
+)
+
+
 
 ;;Inittial environment
 (define init-env
@@ -226,10 +279,48 @@ fundamentals of programming lenguages course project (FLP)|#
     )
   )
 )
+;; References
+
+(define-datatype reference reference?
+  (a-ref (pos number?) (vec vector?))
+)
+
+;;extract references
+(define deref
+  (lambda (ref)
+    (primitive-deref ref)
+  )
+)
+
+(define primitive-deref
+  (lambda (ref)
+    (cases reference ref
+      (a-ref (pos vec) (vector-ref vec pos))
+    )
+  )
+)
+;;Asignation/Update references
+
+(define setref!
+  (lambda (ref val)
+    (primitive-setref! ref val)
+  )
+)
+
+(define primitive-setref!
+  (lambda (ref val)
+    (cases reference ref
+      (a-ref (pos vec) (vector-set! vec pos val))
+    )
+  )
+)
+
   ;; Build the REPL
 (define Interpreter
   (sllgen:make-rep-loop "-->" eval-program (sllgen:make-stream-parser lexical-specification grammar-specification))
 )
 
--(Interpreter)
+
+
+(Interpreter)
 
