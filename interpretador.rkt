@@ -96,7 +96,7 @@ fundamentals of programming lenguages course project (FLP)|#
       (let-exp (ids rands body)
         (let
           (
-            (lvalues (map (lambda (x) (eval-exp x env)) rands))
+            (lvalues (map (lambda (x) (direct-target (eval-exp x env))) rands))
           )
           (eval-exp body (extend-env ids lvalues env))
         )
@@ -127,33 +127,30 @@ fundamentals of programming lenguages course project (FLP)|#
       )
       ;;begin
       (begin-exp (exp lexp)
-        (if (null? lexp) 
+        (if (null? lexp)
           (eval-exp exp env)
-          (begin 
+          (begin
             (eval-exp exp env)
             (letrec
               (
-               (aux (lambda (lexp)
+                (aux (lambda (lexp)
                   (cond
                     [(null? (cdr lexp)) (eval-exp (car lexp) env)]
                     [else (begin (eval-exp (car lexp) env) (aux (cdr lexp)))]
-
-                    )
-                      ))
-               )
-              
-            (aux lexp)
+                  )
+                  )
+                )
               )
+              (aux lexp)
+            )
           )
         )
       )
-      ;;Set 
+      ;;Set
       (set-exp (id exp)
         (begin
-          (begin
-              (setref! (apply-env-ref env id) (eval-exp exp env))
-              1
-          )
+            (setref! (apply-env-ref env id) (eval-exp exp env))
+            1
         )
       )
     )
@@ -188,7 +185,8 @@ fundamentals of programming lenguages course project (FLP)|#
               [(null? ids) amb]
               [else
                 (begin
-                  (vector-set! vec-closure pos (Closure (car ids) (car bodies) amb)) (get-closure (cdr ids) (cdr bodies) (+ pos 1))
+                  (vector-set! vec-closure pos (Closure (car ids) (car bodies) amb))
+                  (get-closure (cdr ids) (cdr bodies) (+ pos 1))
                 )
               ]
             )
@@ -233,10 +231,7 @@ fundamentals of programming lenguages course project (FLP)|#
 
 
 
-;;Inittial environment
-(define init-env
-  (extend-env '(x y z) '(1 2 3) (empty-env))
-)
+
 
 
 ;;Function to evaluate the primitive
@@ -288,9 +283,18 @@ fundamentals of programming lenguages course project (FLP)|#
 ;;extract references
 (define deref
   (lambda (ref)
-    (primitive-deref ref)
+    (cases target (primitive-deref ref)
+      (direct-target (expval) expval)
+      (indirect-target (ref1)
+        (cases target (primitive-deref ref1)
+          (direct-target (exp1) exp1)
+          (indirect-target (p) (eopl:error 'derer "Illegal reference: ~s" ref1))
+        )
+      )
+    )
   )
 )
+
 
 (define primitive-deref
   (lambda (ref)
@@ -303,7 +307,17 @@ fundamentals of programming lenguages course project (FLP)|#
 
 (define setref!
   (lambda (ref val)
-    (primitive-setref! ref val)
+    (let
+      (
+        (ref1
+          (cases target (primitive-deref ref)
+            (direct-target (expval) ref)
+            (indirect-target (ref2) ref2)
+          )
+        )
+      )
+      (primitive-setref! ref1 (direct-target val))
+    )
   )
 )
 
@@ -314,6 +328,45 @@ fundamentals of programming lenguages course project (FLP)|#
     )
   )
 )
+
+;; Step by reference
+
+(define-datatype target target?
+  (direct-target (expval expval?))
+  (indirect-target (ref ref-to-direct-target?))
+)
+
+
+(define expval?
+  (lambda (x)
+    (or
+      (number? x)
+      (boolean? x)
+      (procval? x)
+    )
+  )
+)
+
+(define ref-to-direct-target?
+  (lambda (x)
+    (and (reference? x)
+          (cases reference x
+            (a-ref (vec pos)
+                   (cases target (vector-ref vec pos)
+                     (direct-target (expval) #t)
+                     (indirect-target (ref) #f)
+                    )
+            )
+          )
+    )
+  )
+)
+
+;;Inittial environment
+(define init-env
+  (extend-env '(x y z) (list (direct-target 1) (direct-target 2) (direct-target 3)) (empty-env))
+)
+;; Build the stepper
 
   ;; Build the REPL
 (define Interpreter
