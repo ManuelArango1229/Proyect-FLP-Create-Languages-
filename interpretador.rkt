@@ -20,7 +20,7 @@ fundamentals of programming lenguages course project (FLP)|#
     (numbers (digit (arbno digit) "." digit (arbno digit)) number)
     (numbers ("-" digit (arbno digit) "." digit (arbno digit)) number)
   )
-) 
+)
 
 ;; Define the grammar specification for the Language
 
@@ -77,7 +77,7 @@ fundamentals of programming lenguages course project (FLP)|#
       (lit-exp (n) n)
       (var-exp (id) (apply-env env id))
       ;;Primitive
-      (prim-exp (prim larg) 
+      (prim-exp (prim larg)
         (let
           (
             (lvalues (map (lambda (e) (eval-exp e env)) larg))
@@ -109,7 +109,7 @@ fundamentals of programming lenguages course project (FLP)|#
         (let
           (
             (procV (eval-exp rator env))
-            (lrands (map (lambda (x) (eval-exp x env)) rands))
+            (lrands (map (lambda (x) (eval-rand x env)) rands))
           )
           (if (procval? procV) 
               (cases procval procV
@@ -152,6 +152,31 @@ fundamentals of programming lenguages course project (FLP)|#
             (setref! (apply-env-ref env id) (eval-exp exp env))
             1
         )
+      )
+    )
+  )
+)
+
+;;Eval rand call-exp, exlude var-exp of direct-target
+
+(define eval-rand
+  (lambda (e env)
+    (cases exp e
+      (var-exp (id)
+        (indirect-target
+          (let
+            (
+              (ref (apply-env-ref env id)) 
+            )
+            (cases target (primitive-deref ref)
+              (direct-target (expval) ref)
+              (indirect-target (ref2) ref2)
+            )
+          )
+        )
+      )
+      (else
+       (direct-target (eval-exp e env))
       )
     )
   )
@@ -349,15 +374,16 @@ fundamentals of programming lenguages course project (FLP)|#
 
 (define ref-to-direct-target?
   (lambda (x)
-    (and (reference? x)
-          (cases reference x
-            (a-ref (vec pos)
-                   (cases target (vector-ref vec pos)
-                     (direct-target (expval) #t)
-                     (indirect-target (ref) #f)
-                    )
-            )
+    (and
+      (reference? x)
+      (cases reference x
+        (a-ref (pos vec)
+          (cases target (vector-ref vec pos)
+            (direct-target (expval) #t)
+            (indirect-target (ref) #f)
           )
+        )
+      )
     )
   )
 )
